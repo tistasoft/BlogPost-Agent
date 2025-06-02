@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>CSV Upload and Process</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table,
+        th,
+        td {
+            border: 1px solid #ddd;
+        }
+
+        th,
+        td {
+            padding: 8px;
+            text-align: left;
+        }
+
+        .processing {
+            color: orange;
+        }
+
+        .complete {
+            color: green;
+        }
+
+        .error {
+            color: red;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Upload CSV (url, keywords)</h2>
+    <form id="upload-form" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".csv" required>
+        <button type="submit">Upload</button>
+    </form>
+
+    <div id="data-container"></div>
+    <div style="margin-top: 20px;">
+        <button id="start-btn" disabled>Start Processing</button>
+        <button id="cancel-btn" disabled>Cancel</button>
+        <button id="restart-btn" disabled>Restart</button>
+    </div>
+
+    <script>
+        let rows = [];
+        let currentIndex = 0;
+        let isCancelled = false;
+
+        document.getElementById('upload-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const res = await fetch('/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            rows = data.rows;
+            renderTable();
+            document.getElementById('start-btn').disabled = false;
+        });
+
+        document.getElementById('start-btn').addEventListener('click', async function () {
+            isCancelled = false;
+            this.disabled = true;
+            document.getElementById('cancel-btn').disabled = false;
+            for (let i = currentIndex; i < rows.length; i++) {
+                if (isCancelled) return;
+                rows[i].status = 'processing';
+                renderTable();
+                const res = await fetch('/process-row', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(rows[i])
+                });
+                const result = await res.json();
+                rows[i].status = result.success ? 'complete' : 'error';
+                rows[i].message = result.message;
+                currentIndex++;
+                renderTable();
+            }
+            document.getElementById('cancel-btn').disabled = true;
+            document.getElementById('restart-btn').disabled = false;
+        });
+
+        document.getElementById('cancel-btn').addEventListener('click', function () {
+            isCancelled = true;
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById('cancel-btn').disabled = true;
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', function () {
+            currentIndex = 0;
+            rows.forEach(row => row.status = '');
+            renderTable();
+            document.getElementById('start-btn').disabled = false;
+            this.disabled = true;
+        });
+
+        function renderTable() {
+            const container = document.getElementById('data-container');
+            if (!rows.length) return container.innerHTML = '';
+            container.innerHTML = `
+        <table>
+          <thead>
+            <tr><th>#</th><th>URL</th><th>Keywords</th><th>Status</th><th>Message</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map((row, i) => `
+              <tr>
+                <td>${i + 1}</td>
+                <td>${row.url}</td>
+                <td>${row.keywords}</td>
+                <td class="${row.status}">
+                  ${row.status === 'processing' ? '<span class="loader"></span>' : row.status}
+                </td>
+                <td>${row.message || ''}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+        }
+    </script>
+</body>
+
+</html>
