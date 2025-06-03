@@ -1,7 +1,6 @@
 import os
 import csv
 import requests
-from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from openai import OpenAI
 from wordpress_xmlrpc import Client, WordPressPost
@@ -90,14 +89,14 @@ Instructions:
     )
     return response.choices[0].message.content
 
-# def update_wordpress(post_id, new_content):
-#     post = wp_client.call(GetPost(post_id))
-#     post.content = new_content
-#     wp_client.call(EditPost(post_id, post))
+def update_wordpress(post_id, new_content):
+    post = wp_client.call(GetPost(post_id))
+    post.content = new_content
+    wp_client.call(EditPost(post_id, post))
 
 from datetime import datetime
 
-def update_wordpress(post_id, new_content):
+def update_wordpress_test(post_id, new_content):
     # Get current date and time in a readable format
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
